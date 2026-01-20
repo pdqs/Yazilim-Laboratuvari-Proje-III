@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Kayıt Ol - Kargo Sistemi</title>
+    <style>
+
+        body { background-color: #121212; color: #e0e0e0; margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        a { color: inherit; text-decoration: none; }
+
+        nav { background: #1e1e1e; padding: 0 30px; position: fixed; top: 0; left: 0; width: 100%; height: 60px; z-index: 1000; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; border-bottom: 1px solid #333; }
+        .logo { font-weight: bold; font-size: 1.2em; color: #9d4edd; letter-spacing: 1px; } /* Logo Mor */
+
+
+        .login-chip { font-weight: 600; color: #9d4edd; border: 1px solid #9d4edd; padding: 5px 15px; border-radius: 20px; transition: 0.2s; }
+        .login-chip:hover { background-color: #9d4edd; color: #121212; }
+
+        .page-wrapper { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .form-card { background: #1e1e1e; border-radius: 12px; border: 1px solid #333; padding: 40px; max-width: 380px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.5); margin-top: 60px; }
+        .form-card h2 { text-align: center; color: #9d4edd; margin-bottom: 25px; }
+
+        .form-input, select { display: block; margin: 10px 0 20px; padding: 12px; width: 100%; border-radius: 6px; border: 1px solid #444; background: #2c2c2c; color: #e0e0e0; box-sizing: border-box; font-size: 1em; }
+        .form-input:focus, select:focus { outline: none; border-color: #9d4edd; box-shadow: 0 0 5px rgba(157, 78, 221, 0.3); }
+
+
+        .submit-btn { width: 100%; padding: 12px 0; border-radius: 6px; border: none; background: #9d4edd; color: white; cursor: pointer; font-weight: bold; font-size: 1.1em; margin-top: 15px; transition: 0.3s; }
+        .submit-btn:hover { background: #7b2cbf; transform: translateY(-2px); }
+
+        #message_box { color: #ff4c4c; font-weight: bold; margin-top: 15px; text-align: center; font-size: 0.9em; min-height: 20px;}
+        .login-text { margin-top: 20px; text-align: center; font-size: 0.9em; color: #aaa; }
+        .login-text a { color: #c77dff; text-decoration: underline; } /* Link Açık Mor */
+        .login-text a:hover { color: #9d4edd; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="logo">KARGO.SYS</div>
+    <div>
+        <a href="/login" class="login-chip">Giriş Yap</a>
+    </div>
+</nav>
+
+<div class="page-wrapper">
+    <div class="form-card">
+        <h2>Kayıt Ol</h2>
+
+        <input id="username" type="text" placeholder="Kullanıcı Adı" class="form-input">
+        <input id="email" type="email" placeholder="E-posta Adresi" class="form-input">
+        <input id="password" type="password" placeholder="Şifre" class="form-input">
+
+        <label style="font-size:0.9em; color:#bbb; margin-bottom: 5px; display:block;">Hesap Türü:</label>
+        <select id="role" class="form-input">
+            <option value="USER">Müşteri (Kargo Göndereceğim)</option>
+            <option value="ADMIN">Yönetici (Sistemi Yöneteceğim)</option>
+        </select>
+
+        <button onclick="register_user()" class="submit-btn">Hesabı Oluştur</button>
+        <p id="message_box"></p>
+
+        <p class="login-text">
+            Zaten hesabın var mı? <a href="/login">Giriş Yap</a>
+        </p>
+    </div>
+</div>
+
+<script>
+    function register_user() {
+        const username = document.getElementById('username').value.trim();
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value.trim();
+        const role = document.getElementById('role').value;
+        const msgBox = document.getElementById('message_box');
+
+        msgBox.textContent = '';
+        msgBox.style.color = "#ff4c4c";
+
+        if (!email || !password || !username) {
+            msgBox.textContent = 'Lütfen tüm alanları doldurun.';
+            return;
+        }
+
+        const user_data = {
+            username: username,
+            email: email,
+            password: password,
+            role: role
+        };
+
+        fetch("/api/auth/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(user_data)
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message && (data.message.includes("Başarılı") || data.message.includes("ok"))) {
+                    msgBox.style.color = "#28a745";
+                    msgBox.textContent = "Kayıt Başarılı! Yönlendiriliyorsunuz...";
+
+                    setTimeout(() => { window.location.href = '/login'; }, 1500);
+                } else {
+                    msgBox.textContent = data.message || "Kayıt başarısız.";
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                msgBox.textContent = "Sunucu bağlantı hatası!";
+            });
+    }
+</script>
+</body>
+</html>

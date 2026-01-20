@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <title>KARGO.SYS | Müşteri Paneli</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        :root {
+            --bg: #111827; --panel: #1f2937; --border: #374151; --input-bg: #111827;
+            --text: #f3f4f6; --muted: #9ca3af;
+            --primary: #8b5cf6; --primary-hover: #7c3aed; --primary-soft: #2e1065;
+            --success: #10b981; --warn: #f59e0b; --danger: #ef4444;
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.5), 0 2px 4px -1px rgba(0,0,0,0.3);
+        }
+
+        * { box-sizing: border-box; }
+        body { margin:0; padding:0; font-family:'Inter',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); }
+
+        .page { min-height:100vh; display:flex; flex-direction:column; }
+
+        .topbar {
+            height:64px; display:flex; align-items:center; justify-content:space-between;
+            padding:0 24px; border-bottom:1px solid var(--border); background:var(--panel);
+            position:sticky; top:0; z-index:2000; box-shadow:0 1px 3px rgba(0,0,0,0.3);
+        }
+        .brand { display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:0.5px; font-size:1.1rem; }
+        .brand i { color:var(--primary); }
+        .top-actions { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+        .user-chip {
+            display:inline-flex; align-items:center; gap:8px;
+            border:1px solid var(--border); border-radius:999px; padding:6px 10px;
+            background:rgba(255,255,255,0.03); color:var(--text); font-weight:600; font-size:0.9rem;
+        }
+
+        .layout { flex:1; display:grid; grid-template-columns: 1.2fr 0.8fr; gap:20px; padding:20px; }
+        @media(max-width:1100px){ .layout { grid-template-columns:1fr; } }
+
+        .card { background:var(--panel); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow); padding:20px; }
+        .card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; gap:8px; flex-wrap:wrap; }
+        .card-header h3 { margin:0; font-size:1.1rem; font-weight:600; }
+        .card-sub { color:var(--muted); font-size:0.85rem; }
+
+        .btn {
+            border:1px solid transparent; border-radius:8px;
+            padding:10px 16px; font-weight:600; font-size:0.9rem;
+            background:var(--primary); color:#fff; cursor:pointer; transition:all 0.2s ease;
+        }
+        .btn:hover { background:var(--primary-hover); transform:translateY(-1px); }
+        .btn.ghost { background:transparent; border:1px solid var(--border); color:var(--text); }
+        .btn.danger { background:var(--danger); border-color:var(--danger); }
+        .btn.sm { padding:6px 12px; font-size:0.85rem; }
+        .btn.block { width:100%; }
+
+        .form label { display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted); }
+        .form input, .form select {
+            width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text);
+            padding:10px; border-radius:8px; margin-bottom:12px; outline:none;
+        }
+        .form input:focus, .form select:focus { border-color:var(--primary); }
+
+        .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+        @media(max-width:700px){ .grid-2 { grid-template-columns: 1fr; } }
+
+        .data-table { width:100%; border-collapse:collapse; }
+        .data-table th, .data-table td { padding:12px; text-align:left; border-bottom:1px solid var(--border); }
+        .data-table th {
+            color:var(--muted); font-size:0.8rem; font-weight:600; text-transform:uppercase;
+            background:rgba(0,0,0,0.2);
+        }
+        .data-table td { font-size:0.9rem; }
+        .muted { color:var(--muted); text-align:center; font-style:italic; }
+
+        .status-badge {
+            display:inline-flex; align-items:center; gap:6px;
+            padding:4px 10px; border-radius:999px; font-size:0.8rem; font-weight:700;
+            border:1px solid var(--border); background:rgba(255,255,255,0.03);
+        }
+        .status-BEKLIYOR { color: var(--warn); border-color: rgba(245,158,11,0.35); background: rgba(245,158,11,0.08); }
+        .status-DAGITIMDA { color: #60a5fa; border-color: rgba(96,165,250,0.35); background: rgba(96,165,250,0.08); }
+        .status-TESLIM, .status-TESLIM_EDILDI { color: var(--success); border-color: rgba(16,185,129,0.35); background: rgba(16,185,129,0.08); }
+
+
+        .modal { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:none; align-items:center; justify-content:center; padding:12px; z-index:3000; backdrop-filter:blur(2px); }
+        .modal-content { background:var(--panel); border:1px solid var(--border); border-radius:12px; width:min(1100px,95%); height:min(800px,88vh); overflow:hidden; box-shadow:var(--shadow); display:flex; flex-direction:column; }
+        .modal-header { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid var(--border); background:rgba(0,0,0,0.2); }
+        .modal-body { flex:1; overflow:hidden; }
+        .icon-btn { background:none; border:none; color:var(--text); cursor:pointer; font-size:1.1rem; padding:4px; transition:color 0.2s; }
+        .icon-btn:hover { color:var(--primary); }
+
+        #trackMap { width:100%; height:100%; }
+
+
+        #toastContainer { position:fixed; top:80px; right:20px; display:flex; flex-direction:column; gap:10px; z-index:4000; }
+        .toast { background:var(--panel); border:1px solid var(--border); border-left:4px solid var(--primary); padding:16px; border-radius:8px; box-shadow:var(--shadow); min-width:280px; color:var(--text); }
+        .toast.success { border-left-color:var(--success); }
+        .toast.danger { border-left-color:var(--danger); }
+        .toast.warn { border-left-color:var(--warn); }
+    </style>
+</head>
+
+<body>
+<div class="page">
+    <header class="topbar">
+        <div class="brand"><i class="fa-solid fa-box"></i><span>KARGO.SYS</span></div>
+        <div class="top-actions">
+            <span class="user-chip"><i class="fa-solid fa-user"></i> <span id="username-display">Kullanıcı</span></span>
+            <button class="btn danger ghost" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> Çıkış</button>
+        </div>
+    </header>
+
+    <main class="layout">
+
+        <section class="card">
+            <div class="card-header">
+                <h3>Toplu Kargo Gönder</h3>
+            </div>
+
+            <div class="form">
+                <label>Hedef İstasyon</label>
+                <select id="stationSelect">
+                    <option value="">Yükleniyor...</option>
+                </select>
+
+                <div class="grid-2">
+                    <div>
+                        <label>Toplam Ağırlık (kg)</label>
+                        <input type="number" id="weightInput" placeholder="Örn: 1000" min="1" />
+                        <div class="card-sub">Not: Toplam ağırlık, adet’e tam bölünmeli. (Backend bunu zorluyor.)</div>
+                    </div>
+                    <div>
+                        <label>Koli Adedi</label>
+                        <input type="number" id="quantityInput" value="1" min="1" />
+                    </div>
+                </div>
+
+                <button class="btn block" onclick="submitCargo()"><i class="fa-solid fa-paper-plane"></i> Talep Oluştur</button>
+            </div>
+        </section>
+
+
+        <section class="card">
+            <div class="card-header">
+                <h3>Kargo Durumları</h3>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="btn ghost sm" onclick="loadMyCargos()"><i class="fa-solid fa-rotate"></i> Yenile</button>
+                </div>
+            </div>
+
+            <div style="max-height: calc(100vh - 180px); overflow:auto; border:1px solid var(--border); border-radius:10px;">
+                <table class="data-table" style="margin:0;">
+                    <thead>
+                    <tr>
+                        <th>Tarih</th>
+                        <th>İstasyon</th>
+                        <th>Yük</th>
+                        <th>Durum</th>
+                        <th>İşlem</th>
+                    </tr>
+                    </thead>
+                    <tbody id="cargoTableBody">
+                    <tr><td colspan="5" class="muted">Yükleniyor...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card-sub" style="margin-top:10px;">
+                “Rota Gör” istasyon ile KOÜ arasındaki yolu gösterir.
+            </div>
+        </section>
+    </main>
+</div>
+
+
+<div class="modal" id="trackModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 style="margin:0;"><i class="fa-solid fa-route"></i> Rota</h3>
+            <button class="icon-btn" onclick="closeTrackModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <div id="trackMap"></div>
+        </div>
+    </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    const KOU_LAT = 40.82224624200172;
+    const KOU_LON = 29.92156586537241;
+
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user) window.location.href = '/login';
+    document.getElementById('username-display').innerText = user.username;
+
+    let trackMap = null;
+    let routeLayer = null;
+
+    const $id = (id) => document.getElementById(id);
+    const show = (el) => el.style.display = 'flex';
+    const hide = (el) => el.style.display = 'none';
+
+    function toast(msg, type = 'info') {
+        const cont = $id('toastContainer');
+        const el = document.createElement('div');
+        el.className = `toast ${type}`;
+        el.innerHTML = msg;
+        cont.appendChild(el);
+        setTimeout(() => { el.style.opacity = '0'; }, 3200);
+        setTimeout(() => cont.removeChild(el), 3600);
+    }
+
+    async function fetchJson(url, options) {
+        const res = await fetch(url, options);
+        if (!res.ok) throw new Error(`İstek başarısız: ${res.status}`);
+        return res.json();
+    }
+
+    function escapeHtml(str) {
+        return String(str ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    async function loadStations() {
+        try {
+            const stations = await fetchJson('/api/stations/all');
+            const select = $id('stationSelect');
+            select.innerHTML = '<option value="">İstasyon Seçiniz...</option>';
+            (stations || []).forEach(st => {
+                select.innerHTML += `<option value="${st.id}">${escapeHtml(st.name || ('İstasyon ' + st.id))}</option>`;
+            });
+        } catch (e) {
+            toast("İstasyonlar yüklenemedi.", "danger");
+            $id('stationSelect').innerHTML = '<option value="">Hata</option>';
+        }
+    }
+
+    async function submitCargo() {
+        const stationId = Number($id('stationSelect').value);
+        const weight = Number($id('weightInput').value);
+        const quantity = Number($id('quantityInput').value);
+        const userId = user.userId || user.id;
+
+        if (!stationId || stationId <= 0 || !weight || weight <= 0 || !quantity || quantity <= 0) {
+            toast("İstasyon, ağırlık ve adet zorunlu ve 0'dan büyük olmalı.", "warn");
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/cargo/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, stationId, weight, quantity })
+            });
+
+            if (!res.ok) {
+                const text = await res.text().catch(() => res.statusText);
+                toast(`Talep oluşturulamadı: ${res.status} ${escapeHtml(text)}`, "danger");
+                return;
+            }
+
+            toast("Kargolar başarıyla sisteme girildi!", "success");
+            $id('weightInput').value = '';
+            $id('quantityInput').value = '1';
+            await loadMyCargos();
+        } catch (err) {
+            toast("Talep hatası: " + escapeHtml(err.message), "danger");
+        }
+    }
+
+    async function loadMyCargos() {
+        const userId = user.userId || user.id;
+        const tbody = $id('cargoTableBody');
+        tbody.innerHTML = `<tr><td colspan="5" class="muted">Yükleniyor...</td></tr>`;
+
+        try {
+            const cargos = await fetchJson(`/api/cargo/my-cargos/${userId}`);
+            const list = cargos || [];
+
+            if (!list.length) {
+                tbody.innerHTML = `<tr><td colspan="5" class="muted">Kargo yok</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = list.map(c => {
+                const dateStr = c.requestDate ? new Date(c.requestDate).toLocaleString() : '-';
+                const stName = c.station?.name ?? '-';
+                const stLat = c.station?.latitude;
+                const stLng = c.station?.longitude;
+                const canTrack = (stLat != null && stLng != null);
+
+                const actionHtml = canTrack
+                    ? `<button class="btn ghost sm" style="padding:6px 10px;" onclick="openTrackModal('${escapeHtml(stName)}', ${Number(stLat)}, ${Number(stLng)})">
+               <i class="fa-solid fa-location-dot"></i> Rota Gör
+             </button>`
+                    : `<span class="muted">—</span>`;
+
+                return `
+          <tr>
+            <td>${escapeHtml(dateStr)}</td>
+            <td>${escapeHtml(stName)}</td>
+            <td>${Number(c.weight || 0)} kg</td>
+            <td><span class="status-badge status-${escapeHtml(c.status)}">${escapeHtml(c.status)}</span></td>
+            <td>${actionHtml}</td>
+          </tr>
+        `;
+            }).join('');
+
+        } catch (err) {
+            tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger); font-weight:600;">
+        Kargo listesi çekilemedi: ${escapeHtml(err.message)}
+      </td></tr>`;
+        }
+    }
+
+    function openTrackModal(stationName, lat, lng) {
+        show($id('trackModal'));
+
+        if (!trackMap) {
+            trackMap = L.map('trackMap').setView([KOU_LAT, KOU_LON], 12);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap &copy; CARTO'
+            }).addTo(trackMap);
+        }
+
+        setTimeout(() => trackMap.invalidateSize(), 100);
+        drawTrackingRoute(lat, lng, stationName);
+    }
+
+    function closeTrackModal() {
+        hide($id('trackModal'));
+    }
+
+    async function drawTrackingRoute(endLat, endLng, stationName) {
+        const startLat = KOU_LAT;
+        const startLng = KOU_LON;
+
+        // Eski çizimleri temizle
+        if (routeLayer) trackMap.removeLayer(routeLayer);
+        trackMap.eachLayer(layer => {
+            if (layer instanceof L.Marker || layer instanceof L.CircleMarker) trackMap.removeLayer(layer);
+        });
+
+        L.circleMarker([startLat, startLng], { color: '#10b981', radius: 8 }).addTo(trackMap).bindPopup("KOÜ");
+        L.circleMarker([endLat, endLng], { color: '#ef4444', radius: 8 }).addTo(trackMap).bindPopup("İstasyon: " + stationName);
+
+
+        const url = `/api/route?startLat=${startLat}&startLon=${startLng}&endLat=${endLat}&endLon=${endLng}`;
+
+        try {
+            const res = await fetch(url);
+            if (!res.ok) {
+                const t = await res.text().catch(() => '');
+                console.error("Route API error:", res.status, t);
+                toast(`Rota API hata: ${res.status}`, "danger");
+                return;
+            }
+
+            const raw = await res.json();
+
+
+            let points = [];
+
+            if (Array.isArray(raw) && raw.length) {
+                const first = raw[0];
+
+
+                if (Array.isArray(first) && first.length >= 2) {
+                    points = raw.map(p => [Number(p[0]), Number(p[1])]).filter(p => isFinite(p[0]) && isFinite(p[1]));
+                }
+
+                else if (typeof first === "object" && first !== null) {
+                    points = raw.map(p => {
+                        const lat = (p.lat ?? p.latitude);
+                        const lng = (p.lng ?? p.lon ?? p.longitude);
+                        return [Number(lat), Number(lng)];
+                    }).filter(p => isFinite(p[0]) && isFinite(p[1]));
+                }
+
+                else if (typeof first === "string") {
+                    points = raw.map(s => {
+                        const parts = String(s).split(",");
+                        return [Number(parts[0]), Number(parts[1])];
+                    }).filter(p => isFinite(p[0]) && isFinite(p[1]));
+                }
+            }
+
+            if (!points.length) {
+                console.error("Route API returned unsupported format:", raw);
+                toast("Rota verisi boş/uyumsuz.", "danger");
+                return;
+            }
+
+            routeLayer = L.polyline(points, { color: '#f59e0b', weight: 5, dashArray: '10, 10' }).addTo(trackMap);
+            trackMap.fitBounds(routeLayer.getBounds(), { padding: [40, 40] });
+
+            const mid = Math.floor(points.length / 2);
+            const truckIcon = L.divIcon({
+                className: 'custom-div-icon',
+                html: "<div style='font-size:24px;'>🚚</div>",
+                iconSize: [30, 30]
+            });
+            L.marker(points[mid], { icon: truckIcon }).addTo(trackMap).bindPopup("Kargonuz yolda").openPopup();
+
+        } catch (e) {
+            console.error("drawTrackingRoute exception:", e);
+            toast("Rota çizilemedi (exception).", "danger");
+        }
+    }
+
+
+    function logout() {
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+    }
+
+    (async function init() {
+        await loadStations();
+        await loadMyCargos();
+    })();
+</script>
+</body>
+</html>

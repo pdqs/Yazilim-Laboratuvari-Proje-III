@@ -1,0 +1,1374 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <title>Lojistik Simülasyonu - Rota Detay Paneli</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        :root {
+            --bg: #111827; --panel: #1f2937; --border: #374151; --input-bg: #111827;
+            --text: #f3f4f6; --muted: #9ca3af;
+            --primary: #8b5cf6; --primary-hover: #7c3aed; --primary-soft: #2e1065;
+            --success: #10b981; --warn: #f59e0b; --danger: #ef4444;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+        }
+        * { box-sizing: border-box; }
+        body { margin:0; padding:0; font-family:'Inter',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); }
+        .page { min-height:100vh; display:flex; flex-direction:column; }
+        .topbar { height:64px; display:flex; align-items:center; justify-content:space-between; padding:0 24px; border-bottom:1px solid var(--border); background:var(--panel); position:sticky; top:0; z-index:2000; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
+        .brand { display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:0.5px; font-size:1.1rem; }
+        .brand i { color:var(--primary); }
+        .layout { flex:1; display:grid; grid-template-columns:2fr 1fr; gap:20px; padding:20px; }
+        @media(max-width:1100px){ .layout { grid-template-columns:1fr; } }
+        .left,.right { display:flex; flex-direction:column; gap:20px; }
+        .card { background:var(--panel); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow); padding:20px; }
+        .card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; gap:8px; flex-wrap:wrap; }
+        .card-header h3 { margin:0; font-size:1.1rem; font-weight:600; }
+        .header-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+        .card-label { color:var(--muted); font-size:0.85rem; font-weight:500; text-transform:uppercase; letter-spacing:0.5px; }
+        .card-value { font-size:1.75rem; font-weight:700; margin:8px 0; color:#fff; }
+        .card-sub { color:var(--muted); font-size:0.85rem; }
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; }
+        .map { height:520px; border-radius:8px; overflow:hidden; border:1px solid var(--border); z-index:1; background:#000; }
+        .btn { border:1px solid transparent; border-radius:8px; padding:10px 16px; font-weight:600; font-size:0.9rem; background:var(--primary); color:#fff; cursor:pointer; transition:all 0.2s ease; }
+        .btn:hover { background:var(--primary-hover); transform:translateY(-1px); }
+        .btn.ghost { background:transparent; border:1px solid var(--border); color:var(--text); }
+        .btn.danger { background:var(--danger); border-color:var(--danger); }
+        .btn.sm { padding:6px 12px; font-size:0.8rem; }
+        .chip { display:inline-flex; align-items:center; gap:8px; background:var(--primary-soft); color:#c4b5fd; border:1px solid rgba(139,92,246,0.3); border-radius:6px; padding:4px 10px; font-weight:600; font-size:0.85rem; }
+        .log { max-height:220px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:0; background:var(--input-bg); }
+        .log-entry { padding:10px 12px; border-bottom:1px solid var(--border); font-size:0.85rem; color:var(--muted); display:flex; justify-content:space-between; }
+        .log-entry:last-child { border-bottom:none; }
+        .data-table { width:100%; border-collapse:collapse; }
+        .data-table th,.data-table td { padding:12px; text-align:left; border-bottom:1px solid var(--border); }
+        .data-table th { color:var(--muted); font-size:0.8rem; font-weight:600; text-transform:uppercase; background:rgba(0,0,0,0.2); }
+        .data-table td { font-size:0.9rem; }
+        .muted { color:var(--muted); text-align:center; font-style:italic; }
+        .modal { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:none; align-items:center; justify-content:center; padding:12px; z-index:3000; backdrop-filter:blur(2px); }
+        .modal-content { background:var(--panel); border:1px solid var(--border); border-radius:12px; width:min(900px,95%); max-height:90vh; overflow:hidden; box-shadow:var(--shadow); display:flex; flex-direction:column; }
+        .modal-content.large { width:min(1100px,96%); }
+        .modal-header { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid var(--border); background:rgba(0,0,0,0.2); }
+        .modal-body { padding:20px; overflow:auto; }
+        .modal-footer { padding:16px 20px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; background:rgba(0,0,0,0.2); }
+        #toastContainer { position:fixed; top:80px; right:20px; display:flex; flex-direction:column; gap:10px; z-index:4000; }
+        .toast { background:var(--panel); border:1px solid var(--border); border-left:4px solid var(--primary); padding:16px; border-radius:8px; box-shadow:var(--shadow); min-width:280px; color:var(--text); }
+        .toast.success { border-left-color:var(--success); }
+        .toast.danger { border-left-color:var(--danger); }
+        .toast.warn { border-left-color:var(--warn); }
+        #addStationBtn.btn-active-mode { background:var(--primary-soft); border-color:var(--primary); color:#c4b5fd; }
+        .station-drawer { position:fixed; right:0; top:64px; bottom:0; width:380px; max-width:90vw; background:var(--panel); border-left:1px solid var(--border); box-shadow:-5px 0 20px rgba(0,0,0,0.5); transform:translateX(100%); transition:transform 0.3s cubic-bezier(0.16,1,0.3,1); z-index:1500; display:flex; flex-direction:column; }
+        .station-drawer.open { transform:translateX(0); }
+
+        .icon-btn { background:none; border:none; color:var(--text); cursor:pointer; font-size:1.1rem; padding:4px; transition:color 0.2s; }
+        .icon-btn:hover { color:var(--primary); }
+        .mini-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(100px, 1fr)); gap:10px; }
+        .mini-card { background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:8px; padding:10px; text-align:center; }
+        .alert { padding:12px; border-radius:8px; display:flex; align-items:center; gap:10px; font-size:0.9rem; margin-bottom:10px; }
+        .alert.warn { background:rgba(245, 158, 11, 0.1); border:1px solid rgba(245, 158, 11, 0.3); color:var(--warn); }
+        .badge { padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; }
+        .badge.info { background:rgba(16, 185, 129, 0.2); color:var(--success); }
+        .badge.danger { background:rgba(239, 68, 68, 0.2); color:var(--danger); }
+        .st-BEKLIYOR { color:var(--warn); }
+        .st-DAGITIMDA { color:#60a5fa; }
+        .st-TESLIM { color:var(--success); }
+        .st-TESLIM_EDILDI { color:var(--success); }
+        .radio-group { display:flex; gap:15px; margin:8px 0; }
+        .form label { display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted); }
+        .form input, .form textarea, .form select { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:8px; border-radius:6px; margin-bottom:10px; outline:none;}
+        .form input:focus, .form select:focus { border-color:var(--primary); }
+        .drawer-body { padding:20px; flex:1; overflow-y:auto; }
+        .station-drawer header { display:flex; justify-content:space-between; align-items:center; padding:20px; border-bottom:1px solid var(--border); background:rgba(0,0,0,0.2); }
+        .action-list { display:flex; flex-direction:column; gap:8px; }
+
+        .side-drawer {
+            position: fixed; right: 0; top: 64px; bottom: 0;
+            width: 400px; max-width: 95vw;
+            background: var(--panel); border-left: 1px solid var(--border);
+            box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+            transform: translateX(100%);
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 2500;
+            display: flex; flex-direction: column;
+        }
+        .side-drawer.open { transform: translateX(0); }
+        .drawer-header {
+            padding: 20px; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(0,0,0,0.2);
+        }
+
+        .route-step { display: flex; gap: 15px; margin-bottom: 20px; position: relative; }
+        .route-step::before { content: ''; position: absolute; left: 7px; top: 20px; bottom: -25px; width: 2px; background: var(--border); }
+        .route-step:last-child::before { display: none; }
+        .step-dot { width: 16px; height: 16px; border-radius: 50%; background: var(--primary); z-index: 2; margin-top: 4px; }
+
+        .route-filter {
+            display:flex; gap:8px; align-items:center;
+            padding:6px 10px; border:1px solid var(--border);
+            border-radius:10px; background:rgba(0,0,0,0.15);
+        }
+        .route-filter label { font-size:0.8rem; color:var(--muted); }
+        .route-filter select {
+            background: var(--bg); border: 1px solid var(--border);
+            color: var(--text); padding: 6px 10px;
+            border-radius: 8px; outline:none; min-width: 140px;
+        }
+        .route-filter select:focus { border-color: var(--primary); }
+
+        /* İşlem Geçmişi Tab */
+        .tabs {
+            display:flex; gap:8px; flex-wrap:wrap;
+            padding:6px; border:1px solid var(--border);
+            border-radius:10px; background:rgba(0,0,0,0.12);
+        }
+        .tab-btn {
+            border:1px solid var(--border);
+            background:transparent;
+            color:var(--text);
+            padding:7px 10px;
+            border-radius:8px;
+            cursor:pointer;
+            font-weight:600;
+            font-size:0.85rem;
+            transition:0.2s;
+        }
+        .tab-btn.active {
+            background: var(--primary-soft);
+            border-color: rgba(139,92,246,0.5);
+            color: #c4b5fd;
+        }
+
+        .vh-sub td {
+            padding: 10px 12px !important;
+            background: rgba(0,0,0,0.18);
+        }
+        .vh-mini {
+            width:100%;
+            border-collapse: collapse;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .vh-mini th, .vh-mini td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+        .vh-mini th {
+            background: rgba(0,0,0,0.25);
+            color: var(--muted);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.4px;
+        }
+        .vh-mini tr:last-child td { border-bottom:none; }
+        .vh-pill {
+            display:inline-flex;
+            gap:8px;
+            align-items:center;
+            padding: 2px 8px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: rgba(255,255,255,0.03);
+            color: var(--text);
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+        .vh-muted { color: var(--muted); font-weight: 500; }
+    </style>
+</head>
+<body>
+<div class="page">
+    <header class="topbar">
+        <div class="brand"><i class="fa-solid fa-truck-fast"></i><span>Lojistik Simülasyonu</span></div>
+        <div class="top-actions">
+            <button class="btn ghost" onclick="openSimulationModal()"><i class="fa-solid fa-sliders"></i> Simülasyon</button>
+            <button class="btn ghost" onclick="toggleVehicleModal()"><i class="fa-solid fa-van-shuttle"></i> Araçlar</button>
+            <button class="btn danger ghost" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> Çıkış</button>
+        </div>
+    </header>
+
+    <aside id="route-detail-drawer" class="side-drawer">
+        <div class="drawer-header">
+            <h3 id="panel-vehicle-title" style="margin:0;"><i class="fa-solid fa-truck"></i> Araç Detayı</h3>
+            <button class="icon-btn" onclick="closeRoutePanel()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="drawer-body">
+            <div class="mini-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;">
+                <div class="mini-card">
+                    <div class="card-label">Mesafe</div>
+                    <div id="drawer-dist" style="font-weight:700;">— km</div>
+                </div>
+                <div class="mini-card">
+                    <div class="card-label">Yakıt</div>
+                    <div id="drawer-fuel" style="font-weight:700;">— ₺</div>
+                </div>
+            </div>
+            <div class="card-label" style="margin-bottom:15px;">Teslimat Akışı</div>
+            <div id="panel-route-steps"></div>
+        </div>
+    </aside>
+
+    <main class="layout">
+        <section class="left">
+            <div class="stats-grid">
+                <div class="card"><div class="card-label">Toplam Kargo</div><div class="card-value" id="stat-total-cargo">—</div><div class="card-sub" id="stat-total-weight">— kg</div></div>
+                <div class="card"><div class="card-label">Aktif Araç</div><div class="card-value" id="stat-active-vehicles">—</div><div class="card-sub" id="stat-vehicle-limit">Limit: —</div></div>
+                <div class="card"><div class="card-label">İstasyon</div><div class="card-value" id="stat-stations">—</div><div class="card-sub">Harita üzerindeki tüm istasyonlar</div></div>
+                <div class="card"><div class="card-label">Durum</div><div class="chip" id="stat-mode-chip">—</div><div class="card-sub" id="stat-message">Hazır</div></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>Harita</h3>
+                    <div class="header-actions">
+                        <div class="route-filter" title="Araç seç, sadece onun rotasını gör">
+                            <label><i class="fa-solid fa-route"></i> Rotalar</label>
+                            <select id="routeVehicleSelect" onchange="applyRouteFilterFromUI()">
+                                <option value="ALL">Hepsi</option>
+                            </select>
+                            <button class="btn ghost sm" onclick="showAllRoutes()"><i class="fa-solid fa-layer-group"></i> Hepsi</button>
+                            <button class="btn ghost sm" onclick="applyRouteFilterFromUI()"><i class="fa-solid fa-eye"></i> Göster</button>
+                        </div>
+
+                        <button class="btn ghost sm" onclick="clearMapRoutes()"><i class="fa-solid fa-eraser"></i> Haritayı Temizle</button>
+                        <button class="btn ghost sm" id="addStationBtn" onclick="toggleAddStationMode()"><i class="fa-solid fa-plus"></i> İstasyon Ekle</button>
+                        <button class="btn ghost sm" onclick="seedStations()"><i class="fa-solid fa-seedling"></i> Otomatik Yükle</button>
+                    </div>
+                </div>
+                <div id="map" class="map"></div>
+            </div>
+        </section>
+
+        <section class="right">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Kargo Dağıtımı</h3>
+                    <div class="header-actions">
+                        <button class="btn primary" onclick="checkAndDistribute()"><i class="fa-solid fa-paper-plane"></i> Dağıt</button>
+                        <button class="btn ghost" onclick="toggleAllCargosModal()"><i class="fa-solid fa-boxes-stacked"></i> Liste</button>
+                        <button class="btn ghost" onclick="openReportModal()"><i class="fa-solid fa-chart-simple"></i> Rapor</button>
+                        <button class="btn ghost" onclick="openHistoryModal()"><i class="fa-solid fa-clock-rotate-left"></i> Geçmiş</button>
+                    </div>
+                </div>
+                <div class="section">
+                    <div class="alert warn" id="limitBanner" style="display:none; margin-bottom:10px;">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span id="limitText">Araç limiti aşıldı, reddedilen rota var.</span>
+                    </div>
+
+                    <div id="costSummary" style="display:none; margin-top:10px;">
+                        <div class="mini-grid" style="display:grid;grid-template-columns: repeat(2,1fr);gap:10px;">
+                            <div class="mini-card"><div class="card-label">Toplam Mesafe</div><div id="sum-distance">— km</div></div>
+                            <div class="mini-card"><div class="card-label">Yakıt Maliyeti</div><div id="sum-fuel">— ₺</div></div>
+                            <div class="mini-card"><div class="card-label">Kiralama Tahmini</div><div id="sum-rental">— ₺</div></div>
+                            <div class="mini-card"><div class="card-label">Toplam Maliyet</div><div id="sum-total">— ₺</div></div>
+                        </div>
+                        <div class="card-sub" style="margin-top:6px;">Rota başı yakıt maliyeti listesi için route raporunu kullan.</div>
+                    </div>
+
+                    <div id="routeReport" style="display:none; margin-top:12px;">
+                        <table class="data-table">
+                            <thead><tr><th>Araç</th><th>İstasyonlar</th><th>Kullanıcılar</th><th>Mesafe</th><th>Yakıt</th><th>Kiralama</th><th>Toplam</th></tr></thead>
+                            <tbody id="routeReportBody"><tr><td colspan="7" class="muted">Rapor yok</td></tr></tbody>
+                        </table>
+                    </div>
+
+                    <div id="statusSummary" style="margin-top:12px; display:none;">
+                        <div class="mini-grid" style="display:grid;grid-template-columns: repeat(3,1fr);gap:10px;">
+                            <div class="mini-card"><div class="card-label">BEKLIYOR</div><div id="st-wait">0</div></div>
+                            <div class="mini-card"><div class="card-label">DAGITIMDA</div><div id="st-onway">0</div></div>
+                            <div class="mini-card"><div class="card-label">TESLIM</div><div id="st-done">0</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>İşlem Geçmişi</h3>
+                    <div class="header-actions">
+                        <div class="tabs">
+                            <button class="tab-btn active" id="tabLogBtn" onclick="switchHistoryTab('log')"><i class="fa-solid fa-list"></i> Log</button>
+                            <button class="tab-btn" id="tabVehiclesBtn" onclick="switchHistoryTab('vehicles')"><i class="fa-solid fa-table"></i> Araç Özeti</button>
+                        </div>
+                        <button class="btn ghost sm" onclick="clearLog()"><i class="fa-solid fa-broom"></i></button>
+                    </div>
+                </div>
+
+                <div id="historyTabLog">
+                    <div id="activityLog" class="log"></div>
+                </div>
+
+                <div id="historyTabVehicles" style="display:none;">
+                    <div class="card-sub" style="margin-bottom:10px;">
+                        Son dağıtımın araç rota özeti (konsoldaki gibi).
+                    </div>
+                    <div style="max-height:260px; overflow:auto; border:1px solid var(--border); border-radius:8px;">
+                        <table class="data-table" style="margin:0;">
+                            <thead>
+                            <tr>
+                                <th>Araç</th>
+                                <th>Adım</th>
+                                <th>Mesafe</th>
+                                <th>Yakıt</th>
+                                <th>Kiralama</th>
+                                <th>Toplam</th>
+                            </tr>
+                            </thead>
+                            <tbody id="vehicleHistoryBody">
+                            <tr><td colspan="6" class="muted">Henüz dağıtım yok.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+</div>
+
+
+<div class="modal" id="historyModal">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h3>Geçmiş Runlar</h3>
+            <button class="icon-btn" onclick="closeHistoryModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body" style="max-height:70vh; overflow:auto;">
+            <table class="data-table">
+                <thead><tr><th>ID</th><th>Tarih</th><th>Parametreler</th><th>İşlem</th></tr></thead>
+                <tbody id="historyBody"><tr><td colspan="4" class="muted">Yükleniyor...</td></tr></tbody>
+            </table>
+        </div>
+        <div class="modal-footer">
+            <button class="btn ghost" onclick="closeHistoryModal()">Kapat</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="rentAlertModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Araç Kiralama Gerekli</h3>
+            <button class="icon-btn" onclick="closeRentModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <p>Sistemde mevcut araçlar yetersiz.</p>
+            <div class="mini-grid" style="display:grid;grid-template-columns: repeat(3,1fr);gap:10px;">
+                <div class="mini-card"><div class="card-label">Toplam Yük</div><b id="rent-total">0 kg</b></div>
+                <div class="mini-card"><div class="card-label">Gerekli Araç</div><b id="rent-needed">0</b></div>
+                <div class="mini-card" style="border-color: var(--primary);"><div class="card-label">Tahmini Tutar</div><b id="rent-cost" style="color: var(--primary);">0 ₺</b></div>
+            </div>
+
+
+            <div class="form" style="margin-top:12px;">
+                <label>Kiralama Bedeli (TL/araç)</label>
+                <input type="number" id="rentRentalCost" value="300" min="0" step="50">
+                <label>Yakıt Bedeli (TL/km)</label>
+                <input type="number" id="rentFuelCost" value="1" min="0" step="0.1">
+                <label>Kapasite (kg)</label>
+                <input type="number" id="rentCapacity" value="600" min="100" step="50">
+                <div class="card-sub">Not: Dağıtım parametreleri Simülasyon Ayarları’ndaki değerlerden alınır.</div>
+            </div>
+
+            <div class="alert warn"><i class="fa-solid fa-circle-exclamation"></i> Limit modundaysanız maksimum araç sınırını aşmamaya dikkat edin.</div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn ghost" onclick="closeRentModal()">Vazgeç</button>
+            <button class="btn primary" onclick="rentAndDistribute()"><i class="fa-solid fa-credit-card"></i> Öde ve Kirala</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="vehicleModal">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h3>Araç Filosu</h3>
+            <button class="icon-btn" onclick="toggleVehicleModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <table class="data-table">
+                <thead><tr><th>Araç</th><th>Durum</th><th>Yük</th><th>Maliyet</th></tr></thead>
+                <tbody id="vehicleTableBody"><tr><td colspan="4" class="muted">Yükleniyor...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="allCargosModal">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h3>Kargo Listesi</h3>
+            <button class="icon-btn" onclick="toggleAllCargosModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <table class="data-table">
+                <thead><tr><th>Kullanıcı</th><th>İstasyon</th><th>Ağırlık</th><th>Durum</th><th>İşlem</th></tr></thead>
+                <tbody id="allCargosListBody"><tr><td colspan="5" class="muted">Yükleniyor...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal" id="simulationModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Simülasyon Ayarları</h3>
+            <button class="icon-btn" onclick="closeSimulationModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="modal-body form">
+            <div class="alert warn" style="margin-bottom:12px;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>
+                    <b>Modu Uygula</b> reset yapmaz. <b>Sistemi Sıfırla</b> (Araç+Kargo) reset atar.
+                </span>
+            </div>
+
+            <label>Çalışma Modu</label>
+            <div class="radio-group">
+                <label><input type="radio" name="simMode" value="UNLIMITED" checked onchange="toggleLimitInput()"> Sınırsız Mod</label>
+                <label><input type="radio" name="simMode" value="LIMITED" onchange="toggleLimitInput()"> Limitli Mod</label>
+            </div>
+
+            <div id="limitInputDiv" style="display:none; margin-top:10px;">
+                <label>Maksimum Araç Limiti</label>
+                <input type="number" id="maxVehicleLimit" min="1" value="20" placeholder="Örn: 20" />
+            </div>
+
+            <hr style="border:0; border-top:1px solid var(--border); margin:14px 0; opacity:0.7;">
+
+            <div class="card-label" style="margin-bottom:8px;">Dağıtım / Kiralama Parametreleri</div>
+
+            <label>Yakıt Bedeli (TL/km)</label>
+            <input type="number" id="simFuelCostPerKm" value="1" min="0" step="0.1">
+
+            <label>Kiralama Bedeli (TL/araç)</label>
+            <input type="number" id="simRentalCostPerVehicle" value="200" min="0" step="50">
+
+            <label>Kiralık Araç Kapasitesi (kg)</label>
+            <input type="number" id="simRentalCapacityKg" value="500" min="100" step="50">
+
+            <div class="card-sub">
+                Dağıtım butonu bu değerleri kullanır. Kiralama ekranındaki alanları otomatik günceller.
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn ghost" onclick="closeSimulationModal()">Kapat</button>
+            <button class="btn ghost" onclick="applySimulationSettingsNoReset()"><i class="fa-solid fa-check"></i> Modu Uygula (Reset Yok)</button>
+            <button class="btn danger" onclick="resetSystemVehiclesAndCargos()"><i class="fa-solid fa-bomb"></i> Sistemi Sıfırla (Araç+Kargo)</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="reportModal">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h3>Rapor / Özet</h3>
+            <button class="icon-btn" onclick="closeReportModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <div id="reportSummaryContainer"></div>
+            <div id="reportTableContainer" style="margin-top:16px;"></div>
+        </div>
+    </div>
+</div>
+
+<aside class="station-drawer" id="stationDrawer">
+    <header>
+        <div>
+            <div class="card-label">Seçili İstasyon</div>
+            <div class="card-value" style="font-size:1.2rem; margin:0;" id="drawer-station-name">—</div>
+        </div>
+        <button class="icon-btn" onclick="closeStationDrawer()"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+    <div class="drawer-body">
+        <div class="mini-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+            <div class="mini-card"><div class="card-label">Koordinat</div><div id="drawer-coord" style="font-size:0.75rem;">—</div></div>
+            <div class="mini-card"><div class="card-label">Kargo</div><div id="drawer-cargo-count">—</div></div>
+            <div class="mini-card"><div class="card-label">Son Veri</div><div id="drawer-last-update" style="font-size:0.75rem;">—</div></div>
+        </div>
+        <div class="card-label" style="margin-top:12px; margin-bottom:8px;">Hızlı işlemler</div>
+        <div class="action-list">
+            <button class="btn ghost" onclick="focusStation()" id="action-focus"><i class="fa-solid fa-crosshairs"></i> Haritada Odakla</button>
+            <button class="btn ghost" onclick="copyCoords()" id="action-copy"><i class="fa-solid fa-copy"></i> Koordinatı Kopyala</button>
+            <button class="btn ghost" onclick="toggleCargosFromDrawer()" id="action-cargo"><i class="fa-solid fa-box-open"></i> Kargoları Göster/Gizle</button>
+            <button class="btn ghost danger" onclick="deleteCurrentStation()" id="action-delete"><i class="fa-solid fa-trash"></i> İstasyonu Sil</button>
+        </div>
+        <div class="card-label" style="margin-top:14px; margin-bottom:8px;">Kargo listesi</div>
+        <div id="drawer-cargo-list" class="log" style="max-height:200px; display:none;"></div>
+    </div>
+</aside>
+
+<div id="toastContainer"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    const KOU_LAT = 40.82224624200172;
+    const KOU_LON = 29.92156586537241;
+
+    const ROUTE_COLORS = [
+        '#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981',
+        '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef',
+        '#f43f5e', '#ffffff'
+    ];
+
+    let vehiclesNeededGlobal = 0;
+    let allStationsData = [];
+    let routeLayerObjects = [];
+    let isAddMode = false;
+
+    let simulationConfig = { mode: 'UNLIMITED', maxVehicles: 9999 };
+
+
+    let pricingConfig = {
+        fuelCostPerKm: 3,
+        rentalCostPerVehicle: 300,
+        rentalCapacityKg: 600
+    };
+
+    let currentStationId = null;
+    let drawerCargosVisible = false;
+    let lastDistributionData = null;
+
+    const $ = (sel) => document.querySelector(sel);
+    const $id = (id) => document.getElementById(id);
+    const show = (el) => el.style.display = 'flex';
+    const hide = (el) => el.style.display = 'none';
+
+    function toast(msg, type = 'info') {
+        const cont = $id('toastContainer');
+        const el = document.createElement('div');
+        el.className = `toast ${type}`;
+        el.innerHTML = msg;
+        cont.appendChild(el);
+        setTimeout(() => { el.style.opacity = '0'; }, 3200);
+        setTimeout(() => cont.removeChild(el), 3600);
+    }
+
+    function log(title, detail = '') {
+        const logWrap = $id('activityLog');
+        const row = document.createElement('div');
+        row.className = 'log-entry';
+        row.innerHTML = `<span class="title">${title}</span>${detail ? `<span>${detail}</span>` : ''}`;
+        logWrap.prepend(row);
+    }
+    function clearLog() { $id('activityLog').innerHTML = ''; }
+
+    async function fetchJson(url, options) {
+        const res = await fetch(url, options);
+        if (!res.ok) throw new Error(`İstek başarısız: ${res.status}`);
+        return res.json();
+    }
+
+
+    function switchHistoryTab(tab) {
+        const logTab = $id('historyTabLog');
+        const vehTab = $id('historyTabVehicles');
+        const b1 = $id('tabLogBtn');
+        const b2 = $id('tabVehiclesBtn');
+
+        if (tab === 'vehicles') {
+            logTab.style.display = 'none';
+            vehTab.style.display = 'block';
+            b1.classList.remove('active');
+            b2.classList.add('active');
+        } else {
+            logTab.style.display = 'block';
+            vehTab.style.display = 'none';
+            b2.classList.remove('active');
+            b1.classList.add('active');
+        }
+    }
+
+
+    function toggleLimitInput() {
+        const mode = document.querySelector('input[name="simMode"]:checked').value;
+        $id('limitInputDiv').style.display = (mode === 'LIMITED') ? 'block' : 'none';
+    }
+
+    function syncPricingConfigFromModal() {
+        const fuel = parseFloat($id('simFuelCostPerKm').value || '0');
+        const rental = parseFloat($id('simRentalCostPerVehicle').value || '0');
+        const cap = parseInt($id('simRentalCapacityKg').value || '0', 10);
+
+        pricingConfig.fuelCostPerKm = isFinite(fuel) ? fuel : pricingConfig.fuelCostPerKm;
+        pricingConfig.rentalCostPerVehicle = isFinite(rental) ? rental : pricingConfig.rentalCostPerVehicle;
+        pricingConfig.rentalCapacityKg = isFinite(cap) ? cap : pricingConfig.rentalCapacityKg;
+
+
+        const rf = $id('rentFuelCost');
+        const rr = $id('rentRentalCost');
+        const rc = $id('rentCapacity');
+        if (rf) rf.value = String(pricingConfig.fuelCostPerKm);
+        if (rr) rr.value = String(pricingConfig.rentalCostPerVehicle);
+        if (rc) rc.value = String(pricingConfig.rentalCapacityKg);
+    }
+
+    function applySimulationSettingsNoReset() {
+        const mode = document.querySelector('input[name="simMode"]:checked').value;
+        const limit = parseInt($id('maxVehicleLimit').value, 10);
+
+        simulationConfig = {
+            mode,
+            maxVehicles: (mode === 'UNLIMITED' ? 9999 : (limit || 0))
+        };
+
+        syncPricingConfigFromModal();
+
+        $id('stat-message').innerText = mode === 'LIMITED' ? `Limit: ${simulationConfig.maxVehicles}` : 'Sınırsız';
+        $id('stat-mode-chip').innerText = simulationConfig.mode === 'LIMITED' ? 'Limitli' : 'Sınırsız';
+        $id('stat-vehicle-limit').innerText = `Limit: ${simulationConfig.maxVehicles}`;
+
+        toast("Ayarlar uygulandı (reset yok).", "success");
+        closeSimulationModal();
+    }
+
+    async function resetSystemVehiclesAndCargos() {
+        if (!confirm("Araçlar + Kargolar sıfırlanacak. Emin misin?")) return;
+
+
+        syncPricingConfigFromModal();
+
+        try {
+            await fetch('/api/vehicles/reset', { method: 'POST' });
+            await fetch('/api/cargo/reset-all', { method: 'POST' }).catch(() => {});
+            toast("Sistem sıfırlandı.", "success");
+
+
+            closeSimulationModal();
+            clearMapRoutes();
+            await loadStations();
+            await updateStats();
+
+            $id('costSummary').style.display = 'none';
+            setRouteReport({ routeAssignments: [] });
+            renderVehicleHistoryTable([]);
+
+            log("Reset", "Araç+Kargo");
+        } catch (e) {
+            toast("Reset başarısız.", "danger");
+            console.error(e);
+        }
+    }
+
+    function openSimulationModal() {
+
+        $id('simFuelCostPerKm').value = String(pricingConfig.fuelCostPerKm);
+        $id('simRentalCostPerVehicle').value = String(pricingConfig.rentalCostPerVehicle);
+        $id('simRentalCapacityKg').value = String(pricingConfig.rentalCapacityKg);
+
+
+        const r = document.querySelector(`input[name="simMode"][value="${simulationConfig.mode}"]`);
+        if (r) r.checked = true;
+        $id('maxVehicleLimit').value = String(simulationConfig.maxVehicles === 9999 ? 20 : simulationConfig.maxVehicles);
+        toggleLimitInput();
+
+        show($id('simulationModal'));
+    }
+    function closeSimulationModal() { hide($id('simulationModal')); }
+
+    async function checkAndDistribute() {
+        try {
+
+            syncPricingConfigFromModal();
+
+            const fuelCost = pricingConfig.fuelCostPerKm;
+            const rentalCost = pricingConfig.rentalCostPerVehicle;
+            const capacity = pricingConfig.rentalCapacityKg;
+
+            const params = new URLSearchParams({
+                fuelCostPerKm: fuelCost,
+                rentalCostPerVehicle: rentalCost,
+                rentalCapacityKg: capacity
+            });
+
+            if (simulationConfig.mode === 'LIMITED') {
+                params.set('maxVehicles', String(simulationConfig.maxVehicles));
+            }
+
+            const data = await fetchJson('/api/cargo/deliver-all?' + params.toString(), { method: 'POST' });
+            if (data.status === 'EMPTY') return toast("Kargo yok", 'warn');
+
+            lastDistributionData = data;
+
+            setCostSummary(data);
+            setRouteReport(data);
+            updateStatusSummary();
+            startDistributionAnimationFromRoutes();
+
+            renderVehicleHistoryTable(data.routeAssignments || []);
+            log("Dağıtım", `${(data.routeAssignments || []).length} rota`);
+
+            await updateStats();
+            if ($id('vehicleModal').style.display === 'flex') loadVehicles();
+
+        } catch (e) {
+            toast("Hata!", 'danger');
+            console.error(e);
+        }
+    }
+
+    function setCostSummary(data) {
+        const dist = data.totalDistanceKm ?? 0;
+        const fuel = data.totalFuelCost ?? 0;
+        const rental = data.totalRentalCost ?? data.totalRentalEstimate ?? 0;
+        const total = data.totalCostEstimate ?? (fuel + rental);
+
+        $id('sum-distance').innerText = `${dist.toFixed(2)} km`;
+        $id('sum-fuel').innerText = `${fuel.toFixed(2)} ₺`;
+        $id('sum-rental').innerText = `${rental.toFixed(2)} ₺`;
+        $id('sum-total').innerText = `${total.toFixed(2)} ₺`;
+        $id('costSummary').style.display = 'block';
+    }
+
+    function setRouteReport(data) {
+        const body = $id('routeReportBody');
+        const items = data.routeAssignments || [];
+        if (!items.length) {
+            body.innerHTML = '<tr><td colspan="7" class="muted">Rapor yok</td></tr>';
+            return;
+        }
+
+        const stationNameMap = {};
+        allStationsData.forEach(s => { stationNameMap[s.id] = s.name || s.id; });
+
+        body.innerHTML = items.map(it => {
+            const names = (it.stationIds || []).map(id => stationNameMap[id] || id).join(', ');
+            return `
+                <tr>
+                    <td>Araç ${it.vehicleIndex}</td>
+                    <td>${names}</td>
+                    <td>${Array.from(it.users || []).join(', ')}</td>
+                    <td>${(it.distanceKm || 0).toFixed(2)} km</td>
+                    <td>${(it.fuelCost || 0).toFixed(2)} ₺</td>
+                    <td>${(it.rentalCost || 0).toFixed(2)} ₺</td>
+                    <td>${(it.totalCost || 0).toFixed(2)} ₺</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function openReportModal() {
+        const summary = $id('costSummary').cloneNode(true); summary.style.display = 'block';
+        const reportTable = $id('routeReport').cloneNode(true); reportTable.style.display = 'block';
+        $id('reportSummaryContainer').innerHTML = summary.innerHTML;
+        $id('reportTableContainer').innerHTML = reportTable.innerHTML;
+        show($id('reportModal'));
+    }
+    function closeReportModal() { hide($id('reportModal')); }
+
+    function openHistoryModal() { show($id('historyModal')); loadHistory(); }
+    function closeHistoryModal() { hide($id('historyModal')); }
+
+    async function loadHistory() {
+        const body = $id('historyBody');
+        body.innerHTML = `<tr><td colspan="4" class="muted">Yükleniyor...</td></tr>`;
+        try {
+            const runs = await fetchJson('/api/cargo/runs');
+            if (!runs.length) { body.innerHTML = `<tr><td colspan="4" class="muted">Kayıt yok</td></tr>`; return; }
+            body.innerHTML = runs.map(r => `
+                <tr>
+                    <td>${r.id}</td>
+                    <td>${r.createdAt}</td>
+                    <td><code style="font-size:0.8rem;">${r.paramsJson}</code></td>
+                    <td><button class="btn sm ghost" onclick="rerun(${r.id})"><i class="fa-solid fa-rotate"></i> Tekrar</button></td>
+                </tr>
+            `).join('');
+        } catch (e) {
+            body.innerHTML = `<tr><td colspan="4" class="muted">Hata</td></tr>`;
+        }
+    }
+
+    async function rerun(id) {
+        try {
+            const data = await fetchJson(`/api/cargo/runs/${id}/rerun`, { method: 'POST' });
+            lastDistributionData = data;
+            setCostSummary(data);
+            setRouteReport(data);
+            updateStatusSummary();
+            startDistributionAnimationFromRoutes();
+            renderVehicleHistoryTable(data.routeAssignments || []);
+            toast("Run tekrarlandı", "success");
+            closeHistoryModal();
+            log("Rerun", `#${id}`);
+        } catch (e) {
+            toast("Rerun hata", "danger");
+        }
+    }
+
+
+    function renderVehicleHistoryTable(assignments) {
+        const body = $id('vehicleHistoryBody');
+        if (!assignments || !assignments.length) {
+            body.innerHTML = `<tr><td colspan="6" class="muted">Henüz dağıtım yok.</td></tr>`;
+            return;
+        }
+
+        const sorted = assignments.slice().sort((a,b)=> (a.vehicleIndex||0)-(b.vehicleIndex||0));
+
+        const html = [];
+        for (const a of sorted) {
+            const stepCount = (a.steps && a.steps.length) ? a.steps.length : (a.stationIds || []).length;
+
+            html.push(`
+                <tr>
+                    <td><b>Araç ${a.vehicleIndex}</b></td>
+                    <td>${stepCount}</td>
+                    <td>${((a.distanceKm||0).toFixed(2))} km</td>
+                    <td>${((a.fuelCost||0).toFixed(2))} ₺</td>
+                    <td>${((a.rentalCost||0).toFixed(2))} ₺</td>
+                    <td><b>${((a.totalCost||0).toFixed(2))} ₺</b></td>
+                </tr>
+            `);
+
+
+            const steps = Array.isArray(a.steps) ? a.steps : [];
+            if (steps.length) {
+                const miniRows = steps.map(s => `
+                    <tr>
+                        <td><span class="vh-pill">#${s.step}</span></td>
+                        <td><b>${escapeHtml(s.from ?? '—')}</b> <span class="vh-muted">→</span> ${escapeHtml(s.to ?? 'Üniversite')}</td>
+                        <td>${Number(s.pickedKg ?? 0)} kg</td>
+                        <td><b>${Number(s.carriedKg ?? 0)} kg</b></td>
+                    </tr>
+                `).join('');
+
+                html.push(`
+                    <tr class="vh-sub">
+                        <td colspan="6">
+                            <table class="vh-mini">
+                                <thead>
+                                    <tr>
+                                        <th style="width:90px;">Adım</th>
+                                        <th>Güzergah</th>
+                                        <th style="width:120px;">Aldı</th>
+                                        <th style="width:140px;">Taşıyor</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${miniRows}</tbody>
+                            </table>
+                            <div class="card-sub" style="margin-top:8px;">
+                                Son durumda taşıdığı yük: <b>${Number(steps[steps.length-1].carriedKg ?? 0)} kg</b>
+                            </div>
+                        </td>
+                    </tr>
+                `);
+            } else {
+
+                const stationNameMap = {};
+                allStationsData.forEach(s => { stationNameMap[s.id] = s.name || s.id; });
+                const names = (a.stationIds || []).map(id => stationNameMap[id] || `İstasyon ${id}`).join(' → ');
+                html.push(`
+                    <tr class="vh-sub">
+                        <td colspan="6">
+                            <div class="card-sub">
+                                <b>Duraklar:</b> ${escapeHtml(names || '—')}
+                            </div>
+                            <div class="card-sub" style="margin-top:6px;">
+                                (Not: Backend steps göndermiyor, bu yüzden "Aldı/Taşıyor" logu gösterilemiyor.)
+                            </div>
+                        </td>
+                    </tr>
+                `);
+            }
+        }
+
+        body.innerHTML = html.join('');
+    }
+
+    function escapeHtml(str) {
+        return String(str ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+
+    function closeRentModal() { hide($id('rentAlertModal')); }
+
+    async function rentAndDistribute() {
+        try {
+            if (simulationConfig.mode === 'LIMITED') {
+                const stats = await fetchJson('/api/vehicles/stats');
+                if ((stats.count + vehiclesNeededGlobal) > simulationConfig.maxVehicles) {
+                    return alert(`HATA: Araç limiti aşıldı! En fazla ${simulationConfig.maxVehicles} araca izin var.`);
+                }
+            }
+            await performRent();
+        } catch (e) {
+            toast("Kiralama işlemi başarısız.", 'danger');
+        }
+    }
+
+    async function performRent() {
+        try {
+
+            syncPricingConfigFromModal();
+
+            const rentalCost = pricingConfig.rentalCostPerVehicle;
+            const fuelCost = pricingConfig.fuelCostPerKm;
+            const capacity = pricingConfig.rentalCapacityKg;
+
+            const url = `/api/vehicles/rent-bulk/${vehiclesNeededGlobal}?rentalCost=${rentalCost}&fuelCost=${fuelCost}&capacity=${capacity}`;
+            const res = await fetch(url, { method: 'POST' });
+            if (res.ok) {
+                closeRentModal();
+                updateStats();
+                checkAndDistribute();
+                toast(`Araçlar kiralandı ve dağıtım planı güncellendi.`, 'success');
+                log("Kiralama", `${vehiclesNeededGlobal} araç`);
+            } else {
+                toast("Araç kiralanamadı.", 'danger');
+            }
+        } catch(e) {
+            toast("Hata oluştu.", 'danger');
+        }
+    }
+
+
+    function showRoutePanel(info, color) {
+        if(!info) return;
+
+        $id('route-detail-drawer').classList.add('open');
+        $id('panel-vehicle-title').innerHTML = `<i class="fa-solid fa-truck" style="color:${color}"></i> Araç ${info.vehicleIndex} Detayı`;
+        $id('drawer-dist').innerText = (info.distanceKm || 0).toFixed(2) + " km";
+        $id('drawer-fuel').innerText = (info.fuelCost || 0).toFixed(2) + " ₺";
+
+        const stepsCont = $id('panel-route-steps');
+        stepsCont.innerHTML = '';
+
+
+        if (Array.isArray(info.steps) && info.steps.length) {
+            info.steps.forEach((s) => {
+                const stepDiv = document.createElement('div');
+                stepDiv.className = 'route-step';
+                stepDiv.innerHTML = `
+                    <div class="step-dot" style="background:${color}"></div>
+                    <div>
+                        <div style="font-weight:700;">
+                            Adım ${s.step} • ${escapeHtml(s.from)} <span style="color:var(--muted);">→</span> ${escapeHtml(s.to || 'Üniversite')}
+                        </div>
+                        <div style="margin-top:6px; display:flex; gap:10px; flex-wrap:wrap;">
+                            <span class="vh-pill">Aldı: ${Number(s.pickedKg ?? 0)} kg</span>
+                            <span class="vh-pill">Taşıyor: ${Number(s.carriedKg ?? 0)} kg</span>
+                        </div>
+                    </div>
+                `;
+                stepsCont.appendChild(stepDiv);
+            });
+            return;
+        }
+
+
+        (info.stationIds || []).forEach((id) => {
+            const st = allStationsData.find(s => s.id === id);
+            const name = st ? st.name : `İstasyon ${id}`;
+            const usersList = Array.from(info.users || []).join(', ') || "Kargo Alımı";
+
+            const stepDiv = document.createElement('div');
+            stepDiv.className = 'route-step';
+            stepDiv.innerHTML = `
+                <div class="step-dot" style="background:${color}"></div>
+                <div>
+                    <div style="font-weight:600;">${escapeHtml(name)}</div>
+                    <div style="color:var(--muted); font-size:0.8rem;">${escapeHtml(usersList)}</div>
+                </div>
+            `;
+            stepsCont.appendChild(stepDiv);
+        });
+    }
+
+    function closeRoutePanel() {
+        $id('route-detail-drawer').classList.remove('open');
+    }
+
+    function rebuildRouteVehicleSelect(assignments) {
+        const sel = $id('routeVehicleSelect');
+        const prev = sel.value;
+        sel.innerHTML = `<option value="ALL">Hepsi</option>`;
+
+        const vehicleIndexes = [...new Set((assignments || []).map(a => a.vehicleIndex))].sort((a,b)=>a-b);
+        for (const vi of vehicleIndexes) {
+            const opt = document.createElement('option');
+            opt.value = String(vi);
+            opt.textContent = `Araç ${vi}`;
+            sel.appendChild(opt);
+        }
+
+        if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+        else sel.value = 'ALL';
+    }
+
+    function applyRouteFilterFromUI() {
+        const val = $id('routeVehicleSelect').value;
+        if (val === 'ALL') return showAllRoutes();
+        const vi = parseInt(val, 10);
+        showOnlyVehicleRoute(vi);
+    }
+
+    function showAllRoutes() {
+        closeRoutePanel();
+        for (const obj of routeLayerObjects) {
+            if (!obj.polyline._map) obj.polyline.addTo(map);
+        }
+        fitToVisibleRoutes();
+        toast("Tüm rotalar gösteriliyor.", "info");
+    }
+
+    function showOnlyVehicleRoute(vehicleIndex) {
+        closeRoutePanel();
+        for (const obj of routeLayerObjects) {
+            const shouldShow = obj.vehicleIndex === vehicleIndex;
+            if (shouldShow) {
+                if (!obj.polyline._map) obj.polyline.addTo(map);
+            } else {
+                if (obj.polyline._map) map.removeLayer(obj.polyline);
+            }
+        }
+        fitToVisibleRoutes();
+        toast(`Sadece Araç ${vehicleIndex} rotası gösteriliyor.`, "success");
+    }
+
+    function fitToVisibleRoutes() {
+        const visibles = routeLayerObjects
+            .filter(o => o.polyline && o.polyline._map)
+            .map(o => o.polyline);
+
+        if (!visibles.length) return;
+        const group = new L.featureGroup(visibles);
+        map.fitBounds(group.getBounds(), { padding: [50, 50] });
+    }
+
+
+    function startDistributionAnimationFromRoutes() {
+        clearMapRoutes();
+        closeRoutePanel();
+
+        if (!lastDistributionData || !lastDistributionData.routeAssignments) {
+            toast("Rota verisi yok.", "warn");
+            return;
+        }
+
+        const assignments = lastDistributionData.routeAssignments || [];
+        if (!assignments.length) {
+            toast("Gösterilecek rota yok.", "warn");
+            return;
+        }
+
+        rebuildRouteVehicleSelect(assignments);
+
+        assignments.forEach((assignment) => {
+            const colorIndex = (assignment.vehicleIndex - 1) % ROUTE_COLORS.length;
+            const color = ROUTE_COLORS[colorIndex];
+
+            let polylineCoords = [];
+
+            if (assignment.detailedPath && assignment.detailedPath.length > 0) {
+                polylineCoords = assignment.detailedPath.map(coordStr => {
+                    const parts = coordStr.split(",");
+                    return [parseFloat(parts[0]), parseFloat(parts[1])];
+                });
+            } else {
+                (assignment.stationIds || []).forEach(sid => {
+                    const st = allStationsData.find(s => s.id === sid);
+                    if (st) polylineCoords.push([st.latitude, st.longitude]);
+                });
+            }
+
+            if (polylineCoords.length > 1) {
+                const polyline = L.polyline(polylineCoords, {
+                    color: color,
+                    weight: 5,
+                    opacity: 0.8,
+                    lineJoin: 'round',
+                    lineCap: 'round'
+                }).addTo(map);
+
+                polyline.on('click', () => showRoutePanel(assignment, color));
+                polyline.on('mouseover', function() {
+                    this.setStyle({ weight: 8, opacity: 1.0 });
+                    this.getElement().style.cursor = 'pointer';
+                });
+                polyline.on('mouseout', function() {
+                    this.setStyle({ weight: 5, opacity: 0.8 });
+                });
+
+                routeLayerObjects.push({
+                    vehicleIndex: assignment.vehicleIndex,
+                    polyline,
+                    assignment,
+                    color
+                });
+            }
+        });
+
+        toast(`${assignments.length} araç rotası çizildi.`, 'success');
+        fitToVisibleRoutes();
+        applyRouteFilterFromUI();
+    }
+
+    function clearMapRoutes() {
+        for (const obj of routeLayerObjects) {
+            if (obj.polyline && obj.polyline._map) map.removeLayer(obj.polyline);
+        }
+        routeLayerObjects = [];
+        closeRoutePanel();
+
+        const sel = $id('routeVehicleSelect');
+        if (sel) sel.innerHTML = `<option value="ALL">Hepsi</option>`;
+    }
+
+    async function loadStations() {
+        map.eachLayer((l) => { if (l instanceof L.CircleMarker) map.removeLayer(l); });
+        try {
+            const stations = await fetchJson('/api/stations/all');
+            allStationsData = stations;
+            $id('stat-stations').innerText = stations.length;
+            stations.forEach((st) => {
+                const m = L.circleMarker([st.latitude, st.longitude], {
+                    color: '#8b5cf6', fillColor: '#8b5cf6', fillOpacity: 0.8, radius: 8
+                }).addTo(map);
+                m.on('click', () => openStationDrawer(st));
+            });
+        } catch (e) { console.warn("İstasyonlar yüklenemedi."); }
+    }
+
+    async function seedStations() {
+        try {
+            await fetch('/api/stations/seed', { method: 'POST' });
+            await loadStations();
+            toast("İstasyonlar yüklendi", "success");
+        } catch(e) {
+            toast("Seed endpoint yok veya hata", "danger");
+        }
+    }
+
+    function closeStationDrawer() { currentStationId = null; $id('stationDrawer').classList.remove('open'); }
+    function focusStation() { if (!currentStationId) return; const st = allStationsData.find(s => s.id === currentStationId); if (st) { map.setView([st.latitude, st.longitude], 14); toast("Odaklandı", "info"); } }
+    function copyCoords() { if (!currentStationId) return; const st = allStationsData.find(s => s.id === currentStationId); if (!st) return; const text = `${st.latitude}, ${st.longitude}`; if(navigator.clipboard) { navigator.clipboard.writeText(text); toast("Kopyalandı", "success"); } }
+
+    async function toggleCargosFromDrawer() {
+        const listEl = $id('drawer-cargo-list');
+        drawerCargosVisible = !drawerCargosVisible;
+        listEl.style.display = drawerCargosVisible ? 'block' : 'none';
+        if (drawerCargosVisible) await loadStationCargos(currentStationId);
+    }
+
+    async function deleteCurrentStation() {
+        if (!currentStationId) return;
+        if (!confirm("Bu istasyonu silmek istediğinize emin misiniz?")) return;
+        try {
+            const res = await fetch(`/api/stations/delete/${currentStationId}`, { method: 'DELETE' });
+            if (res.ok) {
+                toast("İstasyon silindi", "success");
+                closeStationDrawer();
+                await loadStations();
+                await updateStats();
+            } else throw new Error();
+        } catch (e) { toast("İstasyon silinemedi", "danger"); }
+    }
+
+    async function loadStationCargos(stationId) {
+        if (!stationId) return;
+        const listEl = $id('drawer-cargo-list');
+        listEl.innerHTML = `<div class="muted" style="padding:10px;">Yükleniyor...</div>`;
+        try {
+            const cargos = await fetchJson(`/api/cargo/station/${stationId}`);
+            if (!cargos || !cargos.length) {
+                listEl.innerHTML = `<div class="muted" style="padding:10px;">Kargo yok.</div>`;
+                $id('drawer-cargo-count').innerText = 0;
+                return;
+            }
+            $id('drawer-cargo-count').innerText = cargos.length;
+            listEl.innerHTML = cargos.map(c => `
+                <div class="log-entry" style="justify-content:space-between; gap:8px;">
+                    <div><div class="title">#${c.id} • ${c.weight} kg</div><div style="color:var(--muted); font-size:0.8rem;">${c.status}</div></div>
+                    <button class="btn sm danger" style="padding:4px 8px;" onclick="deleteCargoFromDrawer(${c.id})"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            `).join('');
+        } catch(e) { listEl.innerHTML = `<div class="muted">Hata</div>`; }
+    }
+
+    async function deleteCargoFromDrawer(id) {
+        if (!confirm("Silinsin mi?")) return;
+        try {
+            await fetch(`/api/cargo/delete/${id}`, { method: 'DELETE' });
+            toast("Kargo silindi", "success");
+            await loadStationCargos(currentStationId);
+            await updateStats();
+        } catch(e) { toast("Hata", "danger"); }
+    }
+
+    function openStationDrawer(st) {
+        currentStationId = st.id;
+        $id('drawer-station-name').innerText = st.name || `İstasyon ${st.id}`;
+        $id('drawer-coord').innerText = `${st.latitude.toFixed(5)}, ${st.longitude.toFixed(5)}`;
+        $id('drawer-last-update').innerText = new Date().toLocaleString();
+        $id('stationDrawer').classList.add('open');
+        drawerCargosVisible = true;
+        $id('drawer-cargo-list').style.display = 'block';
+        loadStationCargos(st.id);
+    }
+
+    async function updateStatusSummary() {
+        try {
+            const cargo = await fetchJson('/api/cargo/all');
+            const wait = cargo.filter(c => c.status === 'BEKLIYOR').length;
+            const onway = cargo.filter(c => c.status === 'DAGITIMDA').length;
+            const done = cargo.filter(c => c.status === 'TESLIM_EDILDI' || c.status === 'TESLIM').length;
+            $id('st-wait').innerText = wait;
+            $id('st-onway').innerText = onway;
+            $id('st-done').innerText = done;
+            $id('statusSummary').style.display = 'block';
+        } catch {}
+    }
+
+    async function updateStats() {
+        try {
+            const stats = await fetchJson('/api/vehicles/stats');
+            $id('stat-active-vehicles').innerText = stats.count ?? '—';
+            $id('stat-vehicle-limit').innerText = `Limit: ${simulationConfig.maxVehicles}`;
+        } catch {
+            $id('stat-active-vehicles').innerText = '0';
+        }
+
+        try {
+            const cargo = await fetchJson('/api/cargo/all');
+            const total = cargo.length;
+            const weight = cargo.reduce((s, c) => s + (c.weight || 0), 0);
+            $id('stat-total-cargo').innerText = total;
+            $id('stat-total-weight').innerText = `${weight} kg`;
+        } catch {
+            $id('stat-total-cargo').innerText = '0';
+            $id('stat-total-weight').innerText = '0 kg';
+        }
+
+        $id('stat-mode-chip').innerText = simulationConfig.mode === 'LIMITED' ? 'Limitli' : 'Sınırsız';
+        updateStatusSummary();
+    }
+
+    async function loadVehicles() {
+        const body = $id('vehicleTableBody');
+        body.innerHTML = `<tr><td colspan="4" class="muted">Yükleniyor...</td></tr>`;
+        try {
+            const stats = await fetchJson('/api/vehicles/stats');
+            const vehicles = stats?.vehicles || [];
+            if (!vehicles.length) {
+                body.innerHTML = `<tr><td colspan="4" class="muted">Kayıt yok.</td></tr>`;
+                return;
+            }
+
+            vehicles.sort((a, b) => a.id - b.id);
+
+            body.innerHTML = vehicles.map((v) => {
+                const isFree = (v.rentalCost === 0);
+                const badge = `<span class="badge ${isFree ? 'info' : 'danger'}">${isFree ? 'ŞİRKET' : 'KİRALIK'}</span>`;
+                const durum = (v.available ?? v.isAvailable ?? true);
+                const realCapacity = v.capacity;
+
+                return `<tr>
+                    <td>${escapeHtml(v.plaka || ('Araç-' + (v.id)))}<div class="card-sub" style="font-size:0.75rem;">ID: ${v.id}</div></td>
+                    <td style="color:${durum ? "#4ade80" : "#fb923c"}; font-weight:600;">${durum ? "HAZIR" : "SEFERDE"} ${badge}</td>
+                    <td>${v.currentLoad || 0} / ${realCapacity} kg</td>
+                    <td style="font-weight:600;">${v.rentalCost || 0} ₺</td>
+                </tr>`;
+            }).join('');
+        } catch (e) {
+            console.error(e);
+            body.innerHTML = `<tr><td colspan="4" class="muted">Yüklenemedi.</td></tr>`;
+        }
+    }
+
+    async function toggleAllCargosModal() {
+        const m = $id('allCargosModal');
+        m.style.display = m.style.display === "flex" ? "none" : "flex";
+        if (m.style.display === "flex") {
+            try {
+                const c = await fetchJson('/api/cargo/all');
+                $id('allCargosListBody').innerHTML = (c || []).map((x) =>
+                    `<tr>
+                        <td>${escapeHtml(x.username)}</td>
+                        <td>${escapeHtml(x.stationName)}</td>
+                        <td>${x.weight}kg</td>
+                        <td class="st-${escapeHtml(x.status)}">${escapeHtml(x.status)}</td>
+                        <td><i class="fa-solid fa-trash" style="color:#ef4444; cursor:pointer;" onclick="deleteCargo(${x.id})"></i></td>
+                    </tr>`
+                ).join('');
+            } catch (e) {
+                $id('allCargosListBody').innerHTML = "<tr><td colspan='5' class='muted'>Yüklenemedi</td></tr>";
+            }
+        }
+    }
+
+    async function deleteCargo(id) {
+        if (!confirm("Emin misiniz?")) return;
+        await fetch(`/api/cargo/delete/${id}`, { method: 'DELETE' });
+        toast("Silindi", 'success');
+        toggleAllCargosModal();
+        updateStats();
+    }
+
+    function toggleVehicleModal() {
+        const m = $id('vehicleModal');
+        m.style.display = m.style.display === "flex" ? "none" : "flex";
+        if (m.style.display === "flex") loadVehicles();
+    }
+
+    function toggleAddStationMode() {
+        isAddMode = !isAddMode;
+        $id('addStationBtn').classList.toggle('btn-active-mode');
+        map.getContainer().style.cursor = isAddMode ? "crosshair" : "";
+        if (isAddMode) toast("Haritaya tıklayarak ekleyin.", "info");
+    }
+
+    const map = L.map('map').setView([KOU_LAT, KOU_LON], 11);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap &copy; CARTO'
+    }).addTo(map);
+
+    map.on('click', async (e) => {
+        if (!isAddMode) return;
+        const n = prompt("İstasyon Adı:");
+        if (!n) return;
+        try {
+            await fetch('/api/stations/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: n, latitude: e.latlng.lat, longitude: e.latlng.lng })
+            });
+            await loadStations();
+            toast("Eklendi", "success");
+            toggleAddStationMode();
+        } catch(err) {
+            toast("Hata", "danger");
+        }
+    });
+
+    function logout() {
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+    }
+
+    (async function init() {
+        log("Başlatılıyor...");
+        await loadStations();
+        await updateStats();
+        log("Hazır");
+
+
+        try { syncPricingConfigFromModal(); } catch {}
+    })();
+</script>
+</body>
+</html>

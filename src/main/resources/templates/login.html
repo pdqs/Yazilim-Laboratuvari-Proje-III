@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Giriş Yap - Kargo Sistemi</title>
+    <style>
+
+        body { background-color: #121212; color: #e0e0e0; margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        a { color: inherit; text-decoration: none; }
+
+        nav { background: #1e1e1e; padding: 0 30px; position: fixed; top: 0; left: 0; width: 100%; height: 60px; z-index: 1000; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; border-bottom: 1px solid #333; }
+        .logo { font-weight: bold; font-size: 1.2em; color: #9d4edd; letter-spacing: 1px; }
+
+        .register-chip { font-weight: 600; color: #9d4edd; border: 1px solid #9d4edd; padding: 5px 15px; border-radius: 20px; transition: 0.2s; }
+        .register-chip:hover { background-color: #9d4edd; color: #121212; }
+
+        .page-wrapper { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .form-card { background: #1e1e1e; border-radius: 12px; border: 1px solid #333; padding: 40px; max-width: 380px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.5); margin-top: 60px; }
+        .form-card h2 { text-align: center; color: #9d4edd; margin-bottom: 25px; }
+
+        .form-input { display: block; margin: 10px 0 20px; padding: 12px; width: 100%; border-radius: 6px; border: 1px solid #444; background: #2c2c2c; color: #e0e0e0; box-sizing: border-box; font-size: 1em; }
+        .form-input:focus { outline: none; border-color: #9d4edd; box-shadow: 0 0 5px rgba(157, 78, 221, 0.3); }
+
+        .submit-btn { width: 100%; padding: 12px 0; border-radius: 6px; border: none; background: #9d4edd; color: white; cursor: pointer; font-weight: bold; font-size: 1.1em; margin-top: 15px; transition: 0.3s; }
+        .submit-btn:hover { background: #7b2cbf; transform: translateY(-2px); }
+
+        #error_msg { color: #ff4c4c; font-weight: bold; margin-top: 15px; text-align: center; font-size: 0.9em; min-height: 20px;}
+        .register-text { margin-top: 20px; text-align: center; font-size: 0.9em; color: #aaa; }
+        .register-text a { color: #c77dff; text-decoration: underline; }
+        .register-text a:hover { color: #9d4edd; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="logo">KARGO.SYS</div>
+    <div>
+        <a href="/register" class="register-chip">Kayıt Ol</a>
+    </div>
+</nav>
+
+<div class="page-wrapper">
+    <div class="form-card">
+        <h2>Giriş Yap</h2>
+
+        <input id="email" type="email" placeholder="E-posta Adresi" class="form-input">
+        <input id="password" type="password" placeholder="Şifre" class="form-input">
+
+        <button onclick="login_user()" class="submit-btn">Giriş Yap</button>
+        <p id="error_msg"></p>
+
+        <p class="register-text">
+            Hesabın yok mu? <a href="/register">Hemen Oluştur</a>
+        </p>
+    </div>
+</div>
+
+<script>
+    function login_user() {
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value.trim();
+        const errorBox = document.getElementById('error_msg');
+
+        errorBox.textContent = '';
+
+        if (!email || !password) {
+            errorBox.textContent = "Lütfen e-posta ve şifrenizi girin.";
+            return;
+        }
+
+        fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: email, password: password })
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.userId) {
+
+                    localStorage.setItem('user', JSON.stringify(data));
+
+                    if(data.role === 'ADMIN') {
+
+                        window.location.href = '/admin';
+                    } else {
+                        window.location.href = '/user';
+                    }
+                } else {
+                    errorBox.textContent = data.message || "Giriş başarısız!";
+                }
+            })
+            .catch(err => {
+                console.error("Hata:", err);
+                errorBox.textContent = "Sunucu hatası!";
+            });
+    }
+</script>
+</body>
+</html>
